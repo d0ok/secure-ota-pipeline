@@ -1,0 +1,12 @@
+build/
+store/
+trusted.gpg
+trusted.gpg~
+*.tar.gz
+__pycache__/
+*.pyc
+backend.log
+# never commit private key material
+*.sec.asc
+*private*.asc
+*.key

@@ -1,0 +1,108 @@
+name: Secure OTA pipeline
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  FW_VERSION: 1.0.${{ github.run_number }}
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build firmware
+        run: make -C firmware VERSION="$FW_VERSION" BUILD="${GITHUB_SHA::8}" OUT="$PWD/build"
+      - name: Smoke test binary
+        run: ./build/firmware.bin
+      - uses: actions/upload-artifact@v4
+        with:
+          name: firmware
+          path: build/firmware.bin
+
+  sbom:
+    needs: build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: firmware
+          path: build
+      - name: Generate CycloneDX SBOM
+        run: scripts/generate_sbom.sh build/firmware.bin "$FW_VERSION" build/sbom.cdx.json
+      - name: Validate SBOM against CycloneDX schema
+        run: |
+          pip install cyclonedx-python-lib[json-validation]
+          python scripts/validate_sbom.py build/sbom.cdx.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: build/sbom.cdx.json
+
+  sign:
+    needs: [build, sbom]
+    runs-on: ubuntu-24.04
+    # Signing key lives in a protected environment with required reviewers.
+    environment: firmware-signing
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: build
+          merge-multiple: true
+      - name: Import signing key
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+        run: echo "$GPG_PRIVATE_KEY" | gpg --batch --import
+      - name: Sign firmware
+        env:
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: scripts/sign_firmware.sh build/firmware.bin "${{ vars.GPG_KEY_ID }}"
+      - name: Verify own signature against committed public key
+        run: scripts/verify_signature.sh build/firmware.bin keys/release-signing.pub.asc
+      - name: Assemble update package
+        run: scripts/package.sh build "$FW_VERSION" "ota-package-$FW_VERSION.tar.gz"
+      - name: Remove private key from runner
+        if: always()
+        run: gpgconf --kill gpg-agent; rm -rf ~/.gnupg
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ota-package
+          path: ota-package-*.tar.gz
+
+  deploy-mock-backend:
+    needs: sign
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: ota-package
+          path: pkg
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install backend
+        run: pip install -r backend/requirements.txt
+      - name: Build trusted keyring from committed public key
+        run: gpg --batch --no-default-keyring --keyring ./trusted.gpg --import keys/release-signing.pub.asc
+      - name: Start mock vehicle backend
+        run: |
+          UPDATE_STORE="$PWD/store" TRUSTED_KEYRING="$PWD/trusted.gpg" \
+            nohup python backend/app.py > backend.log 2>&1 &
+          for i in $(seq 1 20); do curl -sf http://127.0.0.1:8080/healthz && break; sleep 0.5; done
+      - name: Deploy signed package
+        run: scripts/deploy.sh pkg/ota-package-*.tar.gz http://127.0.0.1:8080
+      - name: Negative test - tampered package must be rejected
+        run: scripts/tamper_test.sh pkg/ota-package-*.tar.gz http://127.0.0.1:8080
+      - name: Show backend log
+        if: always()
+        run: cat backend.log
