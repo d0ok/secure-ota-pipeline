@@ -47,8 +47,43 @@ jobs:
           name: sbom
           path: build/sbom.cdx.json
 
+  vuln-scan:
+    # Runs before signing: a release that fails the policy never gets a signature.
+    needs: sbom
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: sbom
+          path: build
+      - name: Install Grype (pinned version, checksum verified)
+        run: |
+          V="$(tr -d '[:space:]' < .grype-version)"   # for example v0.95.0
+          BASE="https://github.com/anchore/grype/releases/download/${V}"
+          curl -sSfLO "${BASE}/grype_${V#v}_linux_amd64.tar.gz"
+          curl -sSfLO "${BASE}/grype_${V#v}_checksums.txt"
+          sha256sum --ignore-missing -c "grype_${V#v}_checksums.txt"
+          tar -xzf "grype_${V#v}_linux_amd64.tar.gz" grype
+          sudo install grype /usr/local/bin/grype
+          grype version
+      - name: Scanner self-test (canary must produce findings)
+        run: |
+          grype sbom:tests/canary.cdx.json -o json > canary-report.json
+          python3 scripts/vuln_gate.py canary-report.json --expect-findings
+      - name: Scan release SBOM
+        run: grype sbom:build/sbom.cdx.json -o json > vuln-report.json
+      - name: Apply release policy (block on Critical or known-exploited)
+        run: python3 scripts/vuln_gate.py vuln-report.json --fail-on Critical --fail-on-kev
+      - name: Keep the report with the release record
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vulnerability-report
+          path: vuln-report.json
+
   sign:
-    needs: [build, sbom]
+    needs: [build, sbom, vuln-scan]
     runs-on: ubuntu-24.04
     # Signing key lives in a protected environment with required reviewers.
     environment: firmware-signing
