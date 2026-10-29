@@ -17,7 +17,7 @@
 
   <rect x="200" y="95" width="130" height="64" rx="8" fill="#dcfce7" stroke="#16a34a"/>
   <text x="265" y="122" text-anchor="middle" font-weight="bold">2. SBOM</text>
-  <text x="265" y="142" text-anchor="middle" fill="#334155">CycloneDX 1.5</text>
+  <text x="265" y="142" text-anchor="middle" fill="#334155">CycloneDX + Grype</text>
 
   <rect x="360" y="95" width="130" height="64" rx="8" fill="#fef3c7" stroke="#d97706"/>
   <text x="425" y="122" text-anchor="middle" font-weight="bold">3. Sign (GPG)</text>
