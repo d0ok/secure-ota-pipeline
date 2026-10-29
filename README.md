@@ -1,4 +1,5 @@
 # Secure Vehicle Update System with SBOM Pipeline
+[![Secure OTA pipeline](https://github.com/d0ok/secure-ota-pipeline/actions/workflows/pipeline.yml/badge.svg)](https://github.com/d0ok/secure-ota-pipeline/actions/workflows/pipeline.yml)
 
 A demonstration CI/CD pipeline for over-the-air (OTA) vehicle software updates:
 
