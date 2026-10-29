@@ -7,6 +7,8 @@ A demonstration CI/CD pipeline for over-the-air (OTA) vehicle software updates:
 
 A gap analysis maps the pipeline to UN R156 (software update management): [docs/UN_R156_gap_analysis.md](docs/UN_R156_gap_analysis.md).
 
+> **Educational demonstration. Not for real vehicles, and not evidence of regulatory compliance.** See [DISCLAIMER.md](DISCLAIMER.md). Licensed under the [MIT License](LICENSE).
+
 ![Architecture](docs/architecture.svg)
 
 ## What it demonstrates
@@ -106,3 +108,11 @@ docs/            gap analysis and architecture diagram
 ## Limitations
 
 This is a teaching and portfolio project, not a production OTA system. The backend has no TLS, device identity or real persistence; the vehicle side is a user-space simulation, not bootloader or HSM code; vendored or statically linked code must be declared by hand in the SBOM; vulnerabilities are checked at build time only, not monitored after release; keys are software keys. See the gap analysis for the full list, and do not read it as evidence of R156 compliance.
+
+## Disclaimer
+
+This is an independent educational project, not for use with real vehicles or safety-relevant systems, and not legal, regulatory or security advice. The gap analysis is a self-assessment that no approval authority or auditor has reviewed. The project is not affiliated with UNECE, any vehicle manufacturer, or the tools it uses. Read [DISCLAIMER.md](DISCLAIMER.md) in full before relying on or referring to any part of it.
+
+## License
+
+Released under the [MIT License](LICENSE). Third-party tools used at run time (GnuPG, Flask, Grype and others) are covered by their own licences and are not bundled.
