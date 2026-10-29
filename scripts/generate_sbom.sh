@@ -36,11 +36,19 @@ def run(cmd):
 
 
 def distro():
+    """Return (id, release) from /etc/os-release, e.g. ("ubuntu", "ubuntu-24.04").
+
+    The release is what vulnerability scanners need to pick the right
+    vendor security data; without it, matching silently finds nothing.
+    """
     try:
-        kv = dict(l.strip().split("=", 1) for l in open("/etc/os-release") if "=" in l)
-        return kv.get("ID", "linux").strip('"')
+        kv = {k: v.strip().strip('"') for k, v in
+              (l.split("=", 1) for l in open("/etc/os-release") if "=" in l)}
     except OSError:
-        return "linux"
+        return "linux", None
+    os_id = kv.get("ID", "linux")
+    ver = kv.get("VERSION_ID") or kv.get("VERSION_CODENAME")
+    return os_id, (f"{os_id}-{ver}" if ver else None)
 
 
 def prop(name, value):
@@ -52,8 +60,10 @@ def detect_linked_libraries(binary):
     code, text = run(["ldd", binary])
     if code != 0:  # static binary: nothing to detect
         return []
-    ns = distro()
+    ns, release = distro()
     arch_code, arch = run(["dpkg", "--print-architecture"])
+    arch_q = [f"arch={arch}"] if arch_code == 0 and arch else []
+    distro_q = [f"distro={release}"] if release else []
     comps, seen = [], set()
     for line in text.splitlines():
         m = re.search(r"(\S+)\s+=>\s+(/\S+)", line) or re.match(r"\s*(/\S+)\s+\(", line)
@@ -74,9 +84,16 @@ def detect_linked_libraries(binary):
                     pkg = owner.split(":")[0]
                     break
         if pkg:
-            _, info = run(["dpkg-query", "-W", "-f=${Version}\t${Maintainer}", pkg])
-            ver, _, maint = info.partition("\t")
-            purl = f"pkg:deb/{ns}/{pkg}@{ver}" + (f"?arch={arch}" if arch_code == 0 else "")
+            _, info = run(["dpkg-query", "-W", "-f=${Version}\t${Maintainer}\t"
+                           "${source:Package}\t${source:Version}", pkg])
+            ver, maint, src, src_ver = (info.split("\t") + ["", "", "", ""])[:4]
+            # Distro security data is keyed by SOURCE package (libc6 -> glibc).
+            # Without the upstream qualifier, scanners find nothing for such packages.
+            upstream_q = []
+            if src and src != pkg:
+                upstream_q = ["upstream=" + src + (f"%40{src_ver}" if src_ver and src_ver != ver else "")]
+            q = arch_q + upstream_q + distro_q
+            purl = f"pkg:deb/{ns}/{pkg}@{ver}" + (("?" + "&".join(q)) if q else "")
             comp = {
                 "type": "library",
                 "bom-ref": purl,
