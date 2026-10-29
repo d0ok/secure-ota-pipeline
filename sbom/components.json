@@ -1,15 +1,6 @@
 [
   {
     "type": "library",
-    "bom-ref": "pkg:generic/glibc@2.39",
-    "name": "glibc",
-    "version": "2.39",
-    "purl": "pkg:generic/glibc@2.39",
-    "licenses": [{ "license": { "id": "LGPL-2.1-or-later" } }],
-    "supplier": { "name": "GNU Project" }
-  },
-  {
-    "type": "library",
     "bom-ref": "pkg:generic/mock-can-driver@0.3.1",
     "name": "mock-can-driver",
     "version": "0.3.1",
