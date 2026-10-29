@@ -105,6 +105,8 @@ def upload():
         dest.mkdir(parents=True)
         for p in td.iterdir():
             (dest / p.name).write_bytes(p.read_bytes())
+        # keep the exact signed package so vehicles can fetch and verify it themselves
+        (dest / "package.tar.gz").write_bytes(data)
         (dest / "verification.json").write_text(json.dumps({
             "signer_fingerprint": fingerprint,
             "firmware_sha256": fw_sha,
@@ -121,10 +123,26 @@ def list_updates():
     return jsonify({"available": versions})
 
 
-@app.get("/api/v1/updates/<version>/package")
-def get_update(version):
+def _version_dir(version):
     d = (STORE / version).resolve()
     if STORE.resolve() not in d.parents or not d.is_dir():
+        return None
+    return d
+
+
+@app.get("/api/v1/updates/<version>/package")
+def get_package(version):
+    """The complete signed package (firmware, signature, SBOM, manifest)."""
+    d = _version_dir(version)
+    if d is None or not (d / "package.tar.gz").exists():
+        return reject("not found", 404)
+    return send_file(d / "package.tar.gz", as_attachment=True)
+
+
+@app.get("/api/v1/updates/<version>/firmware")
+def get_firmware(version):
+    d = _version_dir(version)
+    if d is None:
         return reject("not found", 404)
     return send_file(d / "firmware.bin", as_attachment=True)
 

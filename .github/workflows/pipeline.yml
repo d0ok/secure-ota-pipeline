@@ -138,6 +138,21 @@ jobs:
         run: scripts/deploy.sh pkg/ota-package-*.tar.gz http://127.0.0.1:8080
       - name: Negative test - tampered package must be rejected
         run: scripts/tamper_test.sh pkg/ota-package-*.tar.gz http://127.0.0.1:8080
+      - name: Vehicle simulation - provision ECU with the pinned release key
+        run: python3 vehicle/ecu_updater.py --state ecu-state provision --pubkey keys/release-signing.pub.asc
+      - name: Vehicle simulation - download and install the update from the backend
+        run: python3 vehicle/ecu_updater.py --state ecu-state update --backend http://127.0.0.1:8080
+      - name: Vehicle simulation - replaying the same package must be refused
+        run: |
+          if python3 vehicle/ecu_updater.py --state ecu-state update --package pkg/ota-package-*.tar.gz; then
+            echo "Replay was accepted" >&2; exit 1
+          fi
+      - name: Vehicle simulation - show ECU state and audit log
+        run: |
+          python3 vehicle/ecu_updater.py --state ecu-state status
+          cat ecu-state/update.log
+      - name: Vehicle client test suite (rollback, downgrade, tampering)
+        run: scripts/vehicle_e2e.sh
       - name: Show backend log
         if: always()
         run: cat backend.log

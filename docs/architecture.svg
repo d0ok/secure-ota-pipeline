@@ -72,18 +72,19 @@
   <text x="640" y="208" fill="#334155" font-size="12">HTTP upload</text>
 
   <!-- Vehicle -->
-  <rect x="700" y="420" width="260" height="110" rx="10" fill="#f1f5f9" stroke="#94a3b8" stroke-dasharray="6 4"/>
-  <text x="714" y="442" font-weight="bold" fill="#475569">Vehicle (not implemented)</text>
-  <text x="714" y="468" fill="#334155">Must re-verify signature and hash,</text>
-  <text x="714" y="486" fill="#334155">check compatibility, handle rollback,</text>
-  <text x="714" y="504" fill="#334155">and inform the user (see gap analysis).</text>
-  <line x1="830" y1="360" x2="830" y2="418" stroke="#334155" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arr)"/>
-  <text x="840" y="395" fill="#334155" font-size="12">download</text>
+  <rect x="700" y="420" width="260" height="110" rx="10" fill="#ede9fe" stroke="#7c3aed"/>
+  <text x="714" y="442" font-weight="bold" fill="#475569">Simulated vehicle (ECU client)</text>
+  <text x="714" y="464" fill="#334155">Re-verifies with its own pinned key:</text>
+  <text x="714" y="480" fill="#334155">hash, signature, SBOM binding,</text>
+  <text x="714" y="496" fill="#334155">anti-rollback. A/B slots, self-test</text>
+  <text x="714" y="512" fill="#334155">and rollback. Not simulated: see gaps.</text>
+  <line x1="830" y1="360" x2="830" y2="418" stroke="#334155" stroke-width="1.5" marker-end="url(#arr)"/>
+  <text x="840" y="395" fill="#334155" font-size="12">download package</text>
 
   <!-- Legend -->
   <rect x="20" y="420" width="640" height="110" rx="10" fill="#ffffff" stroke="#cbd5e1"/>
   <text x="34" y="442" font-weight="bold" fill="#475569">Trust model</text>
   <text x="34" y="466" fill="#334155">The private key exists only in the gated signing job. The matching public key is committed to the repo</text>
-  <text x="34" y="484" fill="#334155">and is the sole trust anchor of the backend keyring. Any other signer is rejected.</text>
+  <text x="34" y="484" fill="#334155">and pinned independently by the backend and the vehicle. The vehicle does not trust the backend.</text>
   <text x="34" y="508" fill="#334155">UN R156 mapping: docs/UN_R156_gap_analysis.md</text>
 </svg>

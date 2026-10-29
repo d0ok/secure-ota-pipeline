@@ -45,6 +45,24 @@ This uses an ephemeral GPG key and runs the same scripts as CI. It ends with `AL
    - Add the variable `GPG_KEY_ID` (the fingerprint printed by the script).
 3. Push to `main`. The workflow in `.github/workflows/pipeline.yml` runs build, sbom, vuln-scan, sign (waits for approval), then deploy-mock-backend.
 
+## Simulated vehicle (ECU client)
+
+The backend verifies packages, but a real vehicle must not trust the backend. `vehicle/ecu_updater.py` re-verifies everything itself, using a public key pinned at "factory" provisioning:
+
+- package structure, firmware hash, GPG signature from the **pinned fingerprint** only, and SBOM-to-firmware binding;
+- **anti-rollback**: a version not newer than anything installed is refused, even if validly signed;
+- **A/B slots**: the image is written to the inactive slot, re-hashed from storage, activated and self-tested; a failed self-test restores the previous slot;
+- an append-only audit log of every install, rejection and rollback.
+
+```bash
+python3 vehicle/ecu_updater.py --state ./ecu provision --pubkey keys/release-signing.pub.asc
+python3 vehicle/ecu_updater.py --state ./ecu update --backend http://127.0.0.1:8080
+python3 vehicle/ecu_updater.py --state ./ecu status
+scripts/vehicle_e2e.sh      # full test: install, replay, rollback, downgrade, 5 attack variants
+```
+
+This is a user-space simulation. Real ECUs verify in a bootloader or HSM, keep the key and rollback counter in protected hardware, and need power-loss testing; none of that is covered here.
+
 ## Vulnerability scanning
 
 The `vuln-scan` job runs before `sign`, so a release that fails the policy never receives a signature.
@@ -79,6 +97,7 @@ sbom/            hand-declared components (detected ones come from the build)
 scripts/         build, sign, verify, package, deploy, scan policy, tests
 tests/           scanner canary SBOM
 backend/         mock vehicle backend (Flask)
+vehicle/         simulated ECU update client
 keys/            public signing key (you add this)
 docs/            gap analysis and architecture diagram
 .github/         workflow
@@ -86,4 +105,4 @@ docs/            gap analysis and architecture diagram
 
 ## Limitations
 
-This is a teaching and portfolio project, not a production OTA system. The backend has no TLS, device identity or real persistence; the vehicle side is not implemented; vendored or statically linked code must be declared by hand in the SBOM; vulnerabilities are checked at build time only, not monitored after release; keys are software keys. See the gap analysis for the full list, and do not read it as evidence of R156 compliance.
+This is a teaching and portfolio project, not a production OTA system. The backend has no TLS, device identity or real persistence; the vehicle side is a user-space simulation, not bootloader or HSM code; vendored or statically linked code must be declared by hand in the SBOM; vulnerabilities are checked at build time only, not monitored after release; keys are software keys. See the gap analysis for the full list, and do not read it as evidence of R156 compliance.
